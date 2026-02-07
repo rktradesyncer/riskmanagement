@@ -5,3 +5,4 @@ dist/
 *.js.map
 *.tsbuildinfo
 next-env.d.ts
+firebase-service-account.json
