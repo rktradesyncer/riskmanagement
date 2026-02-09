@@ -49,31 +49,55 @@ export interface AutoLiqSettings {
 
 /**
  * Get existing auto-liq settings for an account.
- * Tries the owner endpoint first, falls back to the permissioned endpoint.
- * Returns the settings array (may be empty if none exist).
+ * Queries both userAccountAutoLiq and permissionedAccountAutoLiq endpoints
+ * and merges the results, since DLL/DPT may be on either entity.
  */
 export async function getAutoLiqSettings(
   auth: TradovateAuth,
   accountId: number
 ): Promise<UserAccountAutoLiq[]> {
+  let userAutoLiq: UserAccountAutoLiq[] = [];
+  let permAutoLiq: UserAccountAutoLiq[] = [];
+
+  // Try owner endpoint
   try {
-    return await auth.get<UserAccountAutoLiq[]>("/userAccountAutoLiq/deps", {
-      masterid: String(accountId),
-    });
-  } catch (ownerError) {
-    // If owner endpoint fails (401 for permissioned users), try permissioned endpoint
-    const msg = ownerError instanceof Error ? ownerError.message : "";
-    if (msg.includes("401") || msg.includes("Access is denied")) {
-      console.log(
-        `[risk] userAccountAutoLiq/deps denied for account ${accountId}, trying permissionedAccountAutoLiq/deps`
-      );
-      return auth.get<UserAccountAutoLiq[]>(
-        "/permissionedAccountAutoLiq/deps",
-        { masterid: String(accountId) }
-      );
+    userAutoLiq = await auth.get<UserAccountAutoLiq[]>(
+      "/userAccountAutoLiq/deps",
+      { masterid: String(accountId) }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (!msg.includes("401") && !msg.includes("Access is denied")) {
+      throw err;
     }
-    throw ownerError;
+    console.log(`[risk] userAccountAutoLiq/deps denied for account ${accountId}`);
   }
+
+  // Try permissioned endpoint
+  try {
+    permAutoLiq = await auth.get<UserAccountAutoLiq[]>(
+      "/permissionedAccountAutoLiq/deps",
+      { masterid: String(accountId) }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (!msg.includes("401") && !msg.includes("Access is denied")) {
+      throw err;
+    }
+    console.log(`[risk] permissionedAccountAutoLiq/deps denied for account ${accountId}`);
+  }
+
+  // Merge: start with permissioned data, overlay user data on top
+  const perm = permAutoLiq[0] ?? {};
+  const user = userAutoLiq[0] ?? {};
+  const merged = { ...perm, ...user };
+
+  // If we got nothing from either, return empty
+  if (!perm.id && !user.id) {
+    return [];
+  }
+
+  return [merged as UserAccountAutoLiq];
 }
 
 /** List all auto-liq settings visible to the user. */

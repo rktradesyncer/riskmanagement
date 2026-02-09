@@ -1,22 +1,88 @@
 import Hapi from "@hapi/hapi";
+import Joi from "joi";
 import { TradovateAuth } from "../lib/auth";
 import { listAccounts } from "../lib/accounts";
 import { getAutoLiqSettings, setAutoLiqSettings } from "../lib/risk";
-import { openApiSpec } from "./openapi";
 
-// Helper to extract TradovateAuth from credentials
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function getAuth(request: Hapi.Request): TradovateAuth {
   return (request.auth.credentials as any).tradovateAuth;
 }
 
+// ---------------------------------------------------------------------------
+// Response schemas
+// ---------------------------------------------------------------------------
+
+const ErrorSchema = Joi.object({
+  success: Joi.boolean().example(false),
+  error: Joi.string().example("Error description"),
+  code: Joi.string().optional().example("TOKEN_EXPIRED"),
+}).label("ErrorResponse");
+
+const AccountSchema = Joi.object({
+  id: Joi.number().integer().example(37857980),
+  name: Joi.string().example("MFFUEVPRO203682060"),
+  userId: Joi.number().integer().example(150234),
+  accountType: Joi.string().example("Customer"),
+  active: Joi.boolean().example(true),
+  clearingHouseId: Joi.number().integer().optional(),
+  riskCategoryId: Joi.number().integer().optional(),
+  autoLiqProfileId: Joi.number().integer().optional(),
+  marginAccountType: Joi.string().optional().example("Speculator"),
+  legalStatus: Joi.string().optional().example("Individual"),
+}).label("Account");
+
+const AutoLiqSchema = Joi.object({
+  id: Joi.number().integer().example(37857980),
+  dailyLossAutoLiq: Joi.number().allow(null).example(500),
+  dailyProfitAutoLiq: Joi.number().allow(null).example(1000),
+  weeklyLossAutoLiq: Joi.number().allow(null).optional(),
+  weeklyProfitAutoLiq: Joi.number().allow(null).optional(),
+  dailyLossAlert: Joi.number().allow(null).optional(),
+  dailyLossPercentageAlert: Joi.number().allow(null).optional(),
+  marginPercentageAlert: Joi.number().allow(null).optional(),
+  dailyLossLiqOnly: Joi.number().allow(null).optional(),
+  dailyLossPercentageLiqOnly: Joi.number().allow(null).optional(),
+  marginPercentageLiqOnly: Joi.number().allow(null).optional(),
+  dailyLossPercentageAutoLiq: Joi.number().allow(null).optional(),
+  marginPercentageAutoLiq: Joi.number().allow(null).optional(),
+  trailingMaxDrawdown: Joi.number().allow(null).optional(),
+  trailingMaxDrawdownLimit: Joi.number().allow(null).optional(),
+  trailingMaxDrawdownMode: Joi.string().valid("EOD", "RealTime").allow(null).optional(),
+  flattenTimestamp: Joi.string().allow(null).optional(),
+  doNotUnlock: Joi.boolean().allow(null).optional(),
+  changesLocked: Joi.boolean().allow(null).optional(),
+}).label("AutoLiqSettings");
+
+// ---------------------------------------------------------------------------
+// Route registration
+// ---------------------------------------------------------------------------
+
 export function registerRoutes(server: Hapi.Server): void {
   // ------------------------------------------------------------------
-  // Health check (no auth)
+  // Health check
   // ------------------------------------------------------------------
   server.route({
     method: "GET",
-    path: "/health",
-    options: { auth: false },
+    path: "/risk-management/health",
+    options: {
+      auth: false,
+      tags: ["api", "System"],
+      description: "Health check",
+      notes: "Returns service status. No authentication required.",
+      response: {
+        status: {
+          200: Joi.object({
+            status: Joi.string().example("ok"),
+            service: Joi.string().example("tradovate-risk-management"),
+            timestamp: Joi.string().isoDate(),
+          }).label("HealthResponse"),
+        },
+      },
+    },
     handler: () => ({
       status: "ok",
       service: "tradovate-risk-management",
@@ -25,46 +91,42 @@ export function registerRoutes(server: Hapi.Server): void {
   });
 
   // ------------------------------------------------------------------
-  // OpenAPI spec (no auth)
-  // ------------------------------------------------------------------
-  server.route({
-    method: "GET",
-    path: "/openapi.json",
-    options: { auth: false },
-    handler: () => openApiSpec,
-  });
-
-  // ------------------------------------------------------------------
-  // Scalar API docs (no auth)
-  // ------------------------------------------------------------------
-  server.route({
-    method: "GET",
-    path: "/docs",
-    options: { auth: false },
-    handler: (_request, h) => {
-      const html = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Risk Management API Docs</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-</head>
-<body>
-  <script id="api-reference" data-url="/openapi.json"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-</body>
-</html>`;
-      return h.response(html).type("text/html");
-    },
-  });
-
-  // ------------------------------------------------------------------
   // List accounts
   // ------------------------------------------------------------------
   server.route({
     method: "GET",
-    path: "/accounts",
-    options: { auth: "firebase" },
+    path: "/risk-management/accounts",
+    options: {
+      auth: "firebase",
+      tags: ["api", "Accounts"],
+      description: "List Tradovate accounts",
+      notes:
+        "Returns all accounts accessible by the authenticated user's Tradovate connection.",
+      validate: {
+        query: Joi.object({
+          connectionRef: Joi.string()
+            .required()
+            .description("Tradovate connection reference (e.g. TS-447E7D)"),
+        }),
+        headers: Joi.object({
+          authorization: Joi.string()
+            .required()
+            .description("Bearer <firebase_id_token>"),
+        }).unknown(true),
+      },
+      response: {
+        status: {
+          200: Joi.object({
+            success: Joi.boolean().example(true),
+            accounts: Joi.array().items(AccountSchema),
+          }).label("AccountsResponse"),
+          400: ErrorSchema,
+          401: ErrorSchema,
+          404: ErrorSchema,
+          500: ErrorSchema,
+        },
+      },
+    },
     handler: async (request, h) => {
       try {
         const auth = getAuth(request);
@@ -72,57 +134,165 @@ export function registerRoutes(server: Hapi.Server): void {
         return { success: true, accounts };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        console.error("GET /accounts error:", message);
+        console.error("GET /risk-management/accounts error:", message);
+
+        if (message.includes("401") || message.includes("Access is denied")) {
+          return h.response({ success: false, error: "Tradovate token expired. Please reconnect.", code: "TOKEN_EXPIRED" }).code(401);
+        }
         return h.response({ success: false, error: message }).code(500);
       }
     },
   });
 
   // ------------------------------------------------------------------
-  // Get risk settings for an account
+  // Get risk settings
   // ------------------------------------------------------------------
   server.route({
     method: "GET",
-    path: "/risk/{accountId}",
-    options: { auth: "firebase" },
+    path: "/risk-management/risk/{accountId}",
+    options: {
+      auth: "firebase",
+      tags: ["api", "Risk"],
+      description: "Get current risk settings",
+      notes:
+        "Returns the current auto-liquidation settings (DLL, DPT, trailing drawdown, etc.) for a specific account.",
+      validate: {
+        params: Joi.object({
+          accountId: Joi.number()
+            .integer()
+            .required()
+            .description("Tradovate account ID"),
+        }),
+        query: Joi.object({
+          connectionRef: Joi.string()
+            .required()
+            .description("Tradovate connection reference"),
+        }),
+        headers: Joi.object({
+          authorization: Joi.string()
+            .required()
+            .description("Bearer <firebase_id_token>"),
+        }).unknown(true),
+      },
+      response: {
+        status: {
+          200: Joi.object({
+            success: Joi.boolean().example(true),
+            autoLiq: AutoLiqSchema.allow(null),
+          }).label("RiskGetResponse"),
+          400: ErrorSchema,
+          401: ErrorSchema,
+          404: ErrorSchema,
+          500: ErrorSchema,
+        },
+      },
+    },
     handler: async (request, h) => {
       try {
         const auth = getAuth(request);
-        const accountId = parseInt(request.params.accountId, 10);
-
-        if (isNaN(accountId)) {
-          return h.response({ success: false, error: "Invalid account ID" }).code(400);
-        }
-
+        const accountId = request.params.accountId as number;
         const settings = await getAutoLiqSettings(auth, accountId);
         return { success: true, autoLiq: settings[0] ?? null };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        console.error(`GET /risk/${request.params.accountId} error:`, message);
+        console.error(`GET /risk-management/risk/${request.params.accountId} error:`, message);
+
+        if (message.includes("401") || message.includes("Access is denied")) {
+          return h.response({ success: false, error: "Tradovate token expired. Please reconnect.", code: "TOKEN_EXPIRED" }).code(401);
+        }
         return h.response({ success: false, error: message }).code(500);
       }
     },
   });
 
   // ------------------------------------------------------------------
-  // Set risk settings for an account
+  // Set risk settings
   // ------------------------------------------------------------------
   server.route({
     method: "POST",
-    path: "/risk/{accountId}",
-    options: { auth: "firebase" },
+    path: "/risk-management/risk/{accountId}",
+    options: {
+      auth: "firebase",
+      tags: ["api", "Risk"],
+      description: "Set risk limits",
+      notes:
+        "Set daily loss limit (DLL), daily profit target (DPT), and other auto-liquidation parameters for a specific account.",
+      validate: {
+        params: Joi.object({
+          accountId: Joi.number()
+            .integer()
+            .required()
+            .description("Tradovate account ID"),
+        }),
+        payload: Joi.object({
+          connectionRef: Joi.string()
+            .required()
+            .description("Tradovate connection reference")
+            .example("TS-447E7D"),
+          dailyLossAutoLiq: Joi.number()
+            .optional()
+            .description("$ Daily Loss Limit — triggers auto-liquidation when daily loss reaches this amount")
+            .example(500),
+          dailyProfitAutoLiq: Joi.number()
+            .optional()
+            .description("$ Daily Profit Target — triggers auto-liquidation when daily profit reaches this amount")
+            .example(1000),
+          weeklyLossAutoLiq: Joi.number()
+            .optional()
+            .description("$ Weekly Loss Limit"),
+          weeklyProfitAutoLiq: Joi.number()
+            .optional()
+            .description("$ Weekly Profit Target"),
+          dailyLossAlert: Joi.number()
+            .optional()
+            .description("$ Daily Loss Alert threshold"),
+          dailyLossPercentageAlert: Joi.number()
+            .optional()
+            .description("Daily Loss % for Alert"),
+          marginPercentageAlert: Joi.number()
+            .optional()
+            .description("Margin % for Alert"),
+          dailyLossLiqOnly: Joi.number()
+            .optional()
+            .description("$ Daily Loss for Liquidate-Only mode"),
+          dailyLossPercentageLiqOnly: Joi.number()
+            .optional()
+            .description("Daily Loss % for Liq-Only"),
+          marginPercentageLiqOnly: Joi.number()
+            .optional()
+            .description("Margin % for Liq-Only"),
+          dailyLossPercentageAutoLiq: Joi.number()
+            .optional()
+            .description("Daily Loss % for Auto-Liq"),
+          marginPercentageAutoLiq: Joi.number()
+            .optional()
+            .description("Margin % for Auto-Liq"),
+        }).label("SetRiskPayload"),
+        headers: Joi.object({
+          authorization: Joi.string()
+            .required()
+            .description("Bearer <firebase_id_token>"),
+        }).unknown(true),
+      },
+      response: {
+        status: {
+          200: Joi.object({
+            success: Joi.boolean().example(true),
+            autoLiq: AutoLiqSchema,
+          }).label("RiskSetResponse"),
+          400: ErrorSchema,
+          401: ErrorSchema,
+          404: ErrorSchema,
+          500: ErrorSchema,
+        },
+      },
+    },
     handler: async (request, h) => {
       try {
         const auth = getAuth(request);
-        const accountId = parseInt(request.params.accountId, 10);
+        const accountId = request.params.accountId as number;
+        const payload = request.payload as Record<string, unknown>;
 
-        if (isNaN(accountId)) {
-          return h.response({ success: false, error: "Invalid account ID" }).code(400);
-        }
-
-        const payload = request.payload as Record<string, unknown> ?? {};
-
-        // Only forward fields valid for PermissionedAccountAutoLiq
         const allowedFields = [
           "dailyLossAutoLiq",
           "dailyProfitAutoLiq",
@@ -147,7 +317,7 @@ export function registerRoutes(server: Hapi.Server): void {
 
         if (Object.keys(settings).length === 0) {
           return h
-            .response({ success: false, error: "No valid risk parameters provided" })
+            .response({ success: false, error: "No valid risk parameters provided. Include at least one of: dailyLossAutoLiq, dailyProfitAutoLiq, etc." })
             .code(400);
         }
 
@@ -155,16 +325,24 @@ export function registerRoutes(server: Hapi.Server): void {
         return { success: true, autoLiq: result };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        console.error(`POST /risk/${request.params.accountId} error:`, message);
+        console.error(`POST /risk-management/risk/${request.params.accountId} error:`, message);
 
         if (message.includes("401") || message.includes("Access is denied")) {
           return h
-            .response({
-              success: false,
-              error: "Tradovate token expired. Please reconnect.",
-              code: "TOKEN_EXPIRED",
-            })
+            .response({ success: false, error: "Tradovate token expired. Please reconnect.", code: "TOKEN_EXPIRED" })
             .code(401);
+        }
+
+        if (message.includes("Unsupported parameters")) {
+          return h
+            .response({ success: false, error: message, code: "UNSUPPORTED_PARAMS" })
+            .code(400);
+        }
+
+        if (message.includes("Should be account owner")) {
+          return h
+            .response({ success: false, error: "Insufficient permissions. You are not the account owner.", code: "NOT_OWNER" })
+            .code(403);
         }
 
         return h.response({ success: false, error: message }).code(500);
