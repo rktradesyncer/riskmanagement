@@ -1,10 +1,8 @@
 node_modules/
 dist/
-.next/
 .env
 .env.dev
 .env.prod
 *.js.map
 *.tsbuildinfo
-next-env.d.ts
 firebase-service-account.json

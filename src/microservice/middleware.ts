@@ -1,99 +1,89 @@
-import { Request, Response, NextFunction } from "express";
+import Hapi from "@hapi/hapi";
 import { TradovateAuth } from "../lib/auth";
-import { verifyAuthToken, getConnectionToken } from "./firebase";
+import { verifyAuthToken } from "./firebase";
+import { getConnectionToken } from "./supabase";
 
 /**
- * Authenticates the request using a Firebase ID token,
- * then looks up the Tradovate access token from Firebase RTDB
- * based on the connectionRef in the request body or query.
- *
- * Attaches to req:
- *   - tradovateAuth: TradovateAuth instance ready to make API calls
- *   - userId: Firebase user ID
- *   - connectionRef: the connection reference
+ * Hapi auth plugin: verifies Firebase ID token, then looks up the
+ * Tradovate access token from Supabase based on connectionRef.
  */
-export async function firebaseAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    // 1. Extract Firebase ID token
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("[middleware] No Authorization header");
-      res.status(401).json({ error: "Missing Authorization: Bearer <firebase_id_token>" });
-      return;
-    }
+export const authPlugin: Hapi.Plugin<void> = {
+  name: "firebase-tradovate-auth",
+  version: "1.0.0",
+  register: async (server: Hapi.Server) => {
+    server.auth.scheme("firebase-tradovate", () => ({
+      authenticate: async (request: Hapi.Request, h: Hapi.ResponseToolkit) => {
+        try {
+          // 1. Extract Firebase ID token
+          const authHeader = request.headers.authorization;
+          if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return h
+              .response({ error: "Missing Authorization: Bearer <firebase_id_token>" })
+              .code(401)
+              .takeover();
+          }
 
-    const idToken = authHeader.slice(7);
-    if (!idToken) {
-      console.log("[middleware] Empty auth token");
-      res.status(401).json({ error: "Empty auth token" });
-      return;
-    }
+          const idToken = authHeader.slice(7);
+          if (!idToken) {
+            return h
+              .response({ error: "Empty auth token" })
+              .code(401)
+              .takeover();
+          }
 
-    // 2. Verify Firebase token
-    console.log("[middleware] Verifying Firebase token...");
-    const decoded = await verifyAuthToken(idToken);
-    const userId = decoded.uid;
-    console.log("[middleware] Firebase user:", userId);
+          // 2. Verify Firebase token
+          const decoded = await verifyAuthToken(idToken);
+          const userId = decoded.uid;
 
-    // 3. Get connectionRef from body, query, or header
-    const connectionRef =
-      req.body?.connectionRef ??
-      req.query.connectionRef ??
-      (req.headers["x-connection-ref"] as string);
+          // 3. Get connectionRef from payload, query, or header
+          const payload = request.payload as Record<string, unknown> | null;
+          const connectionRef =
+            payload?.connectionRef ??
+            request.query.connectionRef ??
+            request.headers["x-connection-ref"];
 
-    if (!connectionRef) {
-      console.log("[middleware] No connectionRef found in request");
-      res.status(400).json({
-        error: "Missing connectionRef (in body, query param, or X-Connection-Ref header)",
-      });
-      return;
-    }
+          if (!connectionRef) {
+            return h
+              .response({
+                error: "Missing connectionRef (in payload, query param, or X-Connection-Ref header)",
+              })
+              .code(400)
+              .takeover();
+          }
 
-    console.log("[middleware] Looking up token for connection:", connectionRef);
+          // 4. Look up Tradovate token from Supabase
+          const connection = await getConnectionToken(userId, connectionRef as string);
 
-    // 4. Look up Tradovate token from Firebase RTDB
-    const connection = await getConnectionToken(userId, connectionRef as string);
-    console.log("[middleware] Got Tradovate token, url:", connection.url);
+          // 5. Create TradovateAuth instance
+          const baseUrl = connection.url.endsWith("/v1")
+            ? connection.url
+            : `${connection.url}/v1`;
 
-    // Decode the Tradovate JWT payload (not verified, just to inspect)
-    try {
-      const parts = connection.token.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-        console.log("[middleware] Tradovate JWT payload:", JSON.stringify(payload));
-      }
-    } catch {
-      console.log("[middleware] Could not decode Tradovate JWT");
-    }
+          const auth = TradovateAuth.fromToken(baseUrl, connection.token);
 
-    // 5. Create TradovateAuth instance using stored token and URL
-    // connection.url is like "https://demo.tradovateapi.com"
-    const baseUrl = connection.url.endsWith("/v1")
-      ? connection.url
-      : `${connection.url}/v1`;
+          // Return credentials for use in route handlers
+          return h.authenticated({
+            credentials: {
+              userId,
+              connectionRef: connectionRef as string,
+              tradovateAuth: auth,
+            },
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Authentication failed";
+          console.error("[auth] Error:", message);
 
-    const auth = TradovateAuth.fromToken(baseUrl, connection.token);
+          if (message.includes("Firebase ID token has expired") || message.includes("Decoding Firebase")) {
+            return h.response({ error: "Invalid or expired auth token" }).code(401).takeover();
+          } else if (message.includes("No Tradovate token found")) {
+            return h.response({ error: message }).code(404).takeover();
+          }
 
-    // Attach to request
-    (req as any).tradovateAuth = auth;
-    (req as any).userId = userId;
-    (req as any).connectionRef = connectionRef;
+          return h.response({ error: message }).code(401).takeover();
+        }
+      },
+    }));
 
-    next();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Authentication failed";
-    console.error("[middleware] Error:", message);
-
-    if (message.includes("Firebase ID token has expired") || message.includes("Decoding Firebase")) {
-      res.status(401).json({ error: "Invalid or expired auth token" });
-    } else if (message.includes("No Tradovate token found")) {
-      res.status(404).json({ error: message });
-    } else {
-      res.status(500).json({ error: message });
-    }
-  }
-}
+    server.auth.strategy("firebase", "firebase-tradovate");
+  },
+};
