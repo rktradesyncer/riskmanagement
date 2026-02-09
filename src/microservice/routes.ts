@@ -3,6 +3,7 @@ import Joi from "joi";
 import { TradovateAuth } from "../lib/auth";
 import { listAccounts } from "../lib/accounts";
 import { getAutoLiqSettings, setAutoLiqSettings } from "../lib/risk";
+import { getCachedRisk, setCachedRisk, invalidateCachedRisk } from "./cache";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -55,7 +56,7 @@ const AutoLiqSchema = Joi.object({
   flattenTimestamp: Joi.string().allow(null).optional(),
   doNotUnlock: Joi.boolean().allow(null).optional(),
   changesLocked: Joi.boolean().allow(null).optional(),
-}).label("AutoLiqSettings");
+}).unknown(true).label("AutoLiqSettings");
 
 // ---------------------------------------------------------------------------
 // Route registration
@@ -179,20 +180,38 @@ export function registerRoutes(server: Hapi.Server): void {
           200: Joi.object({
             success: Joi.boolean().example(true),
             autoLiq: AutoLiqSchema.allow(null),
+            cached: Joi.boolean().example(false),
           }).label("RiskGetResponse"),
           400: ErrorSchema,
           401: ErrorSchema,
           404: ErrorSchema,
           500: ErrorSchema,
         },
+        options: { stripUnknown: false },
       },
     },
     handler: async (request, h) => {
       try {
-        const auth = getAuth(request);
         const accountId = request.params.accountId as number;
+
+        // Check cache first
+        const cached = getCachedRisk(accountId);
+        if (cached) {
+          console.log(`[cache] HIT for account ${accountId}`);
+          return { success: true, autoLiq: cached, cached: true };
+        }
+
+        const auth = getAuth(request);
         const settings = await getAutoLiqSettings(auth, accountId);
-        return { success: true, autoLiq: settings[0] ?? null };
+        const autoLiq = settings[0] ?? null;
+
+        // Cache the result
+        if (autoLiq) {
+          setCachedRisk(accountId, autoLiq);
+          console.log(`[cache] SET for account ${accountId}`);
+        }
+
+        return { success: true, autoLiq, cached: false };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         console.error(`GET /risk-management/risk/${request.params.accountId} error:`, message);
@@ -322,6 +341,12 @@ export function registerRoutes(server: Hapi.Server): void {
         }
 
         const result = await setAutoLiqSettings(auth, accountId, settings);
+
+        // Update cache with new values
+        invalidateCachedRisk(accountId);
+        setCachedRisk(accountId, result);
+        console.log(`[cache] UPDATED for account ${accountId}`);
+
         return { success: true, autoLiq: result };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";

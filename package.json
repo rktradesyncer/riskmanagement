@@ -22,7 +22,8 @@
     "dotenv": "^17.2.4",
     "firebase-admin": "^13.6.1",
     "hapi-swagger": "^17.3.2",
-    "joi": "^17.13.3"
+    "joi": "^17.13.3",
+    "node-cache": "^5.1.2"
   },
   "devDependencies": {
     "@types/hapi__inert": "^5.2.10",
