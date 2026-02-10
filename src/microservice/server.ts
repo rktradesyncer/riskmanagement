@@ -4,6 +4,7 @@ import Hapi from "@hapi/hapi";
 import Inert from "@hapi/inert";
 import Vision from "@hapi/vision";
 import HapiSwagger from "hapi-swagger";
+import HapiRateLimit from "hapi-rate-limit";
 import { initFirebase } from "./firebase";
 import { authPlugin } from "./middleware";
 import { registerRoutes } from "./routes";
@@ -47,6 +48,25 @@ const init = async () => {
       },
     },
   ]);
+
+  // Register rate limiting
+  await server.register({
+    plugin: HapiRateLimit,
+    options: {
+      userLimit: 60,           // 60 requests per user per window
+      userCache: {
+        expiresIn: 60 * 1000, // 1 minute window
+      },
+      pathLimit: 30,           // 30 requests per path per window
+      pathCache: {
+        expiresIn: 60 * 1000,
+      },
+      headers: true,           // include X-RateLimit headers in response
+      ipWhitelist: [],
+      trustProxy: true,
+      getIpFromProxyHeader: undefined,
+    },
+  });
 
   // Register auth plugin
   await server.register(authPlugin);

@@ -15,7 +15,8 @@
   },
   "include": [
     "src/microservice/**/*",
-    "src/lib/**/*"
+    "src/lib/**/*",
+    "src/types/**/*"
   ],
   "exclude": ["node_modules"]
 }
