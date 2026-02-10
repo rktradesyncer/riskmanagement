@@ -3,7 +3,7 @@ import Joi from "joi";
 import { TradovateAuth } from "../lib/auth";
 import { listAccounts } from "../lib/accounts";
 import { getAutoLiqSettings, setAutoLiqSettings } from "../lib/risk";
-import { getCachedRisk, setCachedRisk, invalidateCachedRisk } from "./cache";
+import { getCachedRisk, setCachedRisk, invalidateCachedRisk, getAllCached } from "./cache";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,6 +87,24 @@ export function registerRoutes(server: Hapi.Server): void {
     handler: () => ({
       status: "ok",
       service: "tradovate-risk-management",
+      timestamp: new Date().toISOString(),
+    }),
+  });
+
+  // ------------------------------------------------------------------
+  // Cache debug (no auth)
+  // ------------------------------------------------------------------
+  server.route({
+    method: "GET",
+    path: "/risk-management/cache",
+    options: {
+      auth: false,
+      tags: ["api", "System"],
+      description: "View cache contents",
+      notes: "Shows all cached risk settings with TTL. No authentication required. For debugging only.",
+    },
+    handler: () => ({
+      entries: getAllCached(),
       timestamp: new Date().toISOString(),
     }),
   });

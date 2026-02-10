@@ -36,3 +36,17 @@ export function setCachedRisk(
 export function invalidateCachedRisk(accountId: number): void {
   cache.del(riskKey(accountId));
 }
+
+/** Get all cached entries (for debugging). */
+export function getAllCached(): Record<string, unknown> {
+  const keys = cache.keys();
+  const entries: Record<string, unknown> = {};
+  for (const key of keys) {
+    const ttl = cache.getTtl(key);
+    entries[key] = {
+      data: cache.get(key),
+      expiresIn: ttl ? Math.round((ttl - Date.now()) / 1000) + "s" : "unknown",
+    };
+  }
+  return entries;
+}
