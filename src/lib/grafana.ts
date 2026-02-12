@@ -14,9 +14,9 @@ const GRAFANA_OTLP_USER = process.env.GRAFANA_OTLP_USER || process.env.GRAFANA_M
 
 const isGrafanaConfigured = GRAFANA_LOKI_URL && GRAFANA_LOKI_USER && GRAFANA_LOKI_TOKEN;
 
-const hostname = isProduction ? "tradesyncer-rm-api" : "tradesyncer-rm-api-testing";
+const hostname = isProduction ? "tradesyncer-prod-rm-api" : "tradesyncer-rm-api-testing";
 const instance = isProduction
-  ? "tradesyncer-rm-api.azurewebsites.net:443"
+  ? "tradesyncer-prod-rm-api.azurewebsites.net:443"
   : "tradesyncer-rm-api-testing.azurewebsites.net:443";
 
 const commonLabels = {

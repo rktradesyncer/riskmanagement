@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: tradesyncer-rm-api
+  AZURE_WEBAPP_NAME: tradesyncer-prod-rm-api
   AZURE_RESOURCE_GROUP: tradesyncer-prod-rg
   AZURE_SUBSCRIPTION_ID: 0a250225-102d-4760-bd5d-9fb2a502101e
   NODE_VERSION: "22.x"
@@ -75,6 +75,6 @@ jobs:
       - name: Deployment status
         run: |
           echo "Deployment to Production complete!"
-          echo "URL: https://tradesyncer-rm-api.azurewebsites.net"
-          echo "Health check: https://tradesyncer-rm-api.azurewebsites.net/risk-management/health"
-          echo "Metrics: https://tradesyncer-rm-api.azurewebsites.net/metrics"
+          echo "URL: https://tradesyncer-prod-rm-api.azurewebsites.net"
+          echo "Health check: https://tradesyncer-prod-rm-api.azurewebsites.net/risk-management/health"
+          echo "Metrics: https://tradesyncer-prod-rm-api.azurewebsites.net/metrics"
