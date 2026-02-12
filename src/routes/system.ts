@@ -1,6 +1,5 @@
 import type { ServerRoute } from "@hapi/hapi";
 import Joi from "joi";
-import { getAllCached } from "../lib/cache";
 
 export const systemRoutes: ServerRoute[] = [
   {
@@ -24,20 +23,6 @@ export const systemRoutes: ServerRoute[] = [
     handler: () => ({
       status: "ok",
       service: "tradovate-risk-management",
-      timestamp: new Date().toISOString(),
-    }),
-  },
-  {
-    method: "GET",
-    path: "/risk-management/cache",
-    options: {
-      auth: false,
-      tags: ["api", "System"],
-      description: "View cache contents",
-      notes: "Shows all cached risk settings with TTL. No authentication required. For debugging only.",
-    },
-    handler: () => ({
-      entries: getAllCached(),
       timestamp: new Date().toISOString(),
     }),
   },

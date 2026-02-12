@@ -16,7 +16,6 @@ dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 console.log(`Loaded env: ${envFile} (NODE_ENV=${nodeEnv})`);
 
 const LOGO_URL = "https://firebasestorage.googleapis.com/v0/b/prop-9f30a.appspot.com/o/images%2FLogo%20(1).png?alt=media&token=8757078d-3711-4f78-9af4-4b8d717aadea";
-const FAVICON_SVG = "data:image/svg+xml,%3Csvg width='320' height='320' viewBox='0 0 320 320' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='320' height='320' fill='url(%23paint0_linear_19_1474)'/%3E%3Cpath d='M65 160.017V112.227H113.985V142.033C113.985 151.954 122.042 160 131.976 160H159.996V253H114.053V177.984C114.053 168.063 105.997 160.017 96.0619 160.017H65Z' fill='white'/%3E%3Cpath d='M255 159.992V207.782H206.015V177.975C206.015 168.054 197.958 160.009 188.024 160.009H160.004V67H205.956V142.016C205.956 151.937 214.012 159.983 223.947 159.983H255V159.992Z' fill='white'/%3E%3Cdefs%3E%3ClinearGradient id='paint0_linear_19_1474' x1='34.5212' y1='3.07011e-06' x2='160' y2='320' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23BEA9FE'/%3E%3Cstop offset='1' stop-color='%23253CFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E";
 
 export const createServer = async (): Promise<Hapi.Server> => {
   initFirebase();
@@ -83,7 +82,7 @@ export const createServer = async (): Promise<Hapi.Server> => {
   <title>Tradesyncer Risk Management API</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}" />
+  <link rel="icon" type="image/png" href="${LOGO_URL}" />
   <style>
     body {
       margin: 0;
