@@ -264,6 +264,11 @@ export const grafanaPlugin: Plugin<{}> = {
         auth: false,
         tags: ["api", "metrics"],
         description: "Prometheus metrics endpoint",
+        plugins: {
+          "hapi-swagger": {
+            exclude: true,
+          },
+        },
       },
       handler: async (_request, h) => {
         const metrics = await getMetrics();
