@@ -9,6 +9,7 @@ on:
 env:
   AZURE_WEBAPP_NAME: tradesyncer-rm-api-testing
   AZURE_RESOURCE_GROUP: tradesyncer-testing-rg
+  AZURE_SUBSCRIPTION_ID: a775ade8-3081-4463-8907-a482cb3fd2c8
   NODE_VERSION: "22.x"
 
 jobs:
@@ -43,6 +44,9 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Select testing subscription
+        run: az account set --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure App Settings
         run: |

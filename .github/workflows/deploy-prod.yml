@@ -9,6 +9,7 @@ on:
 env:
   AZURE_WEBAPP_NAME: tradesyncer-rm-api
   AZURE_RESOURCE_GROUP: tradesyncer-prod-rg
+  AZURE_SUBSCRIPTION_ID: 0a250225-102d-4760-bd5d-9fb2a502101e
   NODE_VERSION: "22.x"
 
 jobs:
@@ -43,6 +44,9 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Select production subscription
+        run: az account set --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure App Settings
         run: |
