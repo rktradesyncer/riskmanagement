@@ -1,7 +1,6 @@
-import NodeCache from "node-cache";
+import { getRedisClient } from "./redis";
+import { logger } from "./grafana";
 
-// 1 hour TTL, check for expired keys every 10 minutes
-const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
 export interface CachedRiskSettings {
   dailyLossAutoLiq?: number | null;
@@ -16,23 +15,44 @@ function riskKey(accountId: number): string {
  * Get cached risk settings for an account.
  * Returns null if not cached or expired.
  */
-export function getCachedRisk(accountId: number): CachedRiskSettings | null {
-  return cache.get<CachedRiskSettings>(riskKey(accountId)) ?? null;
+export async function getCachedRisk(accountId: number): Promise<CachedRiskSettings | null> {
+  try {
+    const client = await getRedisClient();
+    const value = await client?.get(riskKey(accountId));
+    return value ? JSON.parse(value) as CachedRiskSettings : null;
+  } catch (error) {
+    logger.error("Error getting cached risk:", error);
+    return null;
+  }
 }
 
 /**
  * Cache risk settings for an account (1 hour TTL).
  */
-export function setCachedRisk(
+export async function setCachedRisk(
   accountId: number,
   settings: CachedRiskSettings
-): void {
-  cache.set(riskKey(accountId), settings);
+): Promise<void> {
+  try {
+    const client = await getRedisClient();
+    if (client) {
+      await client.setEx(riskKey(accountId), 3600, JSON.stringify(settings));
+    }
+  } catch (error) {
+    logger.error("Error setting cached risk:", error);
+  }
 }
 
 /**
  * Invalidate cached risk settings for an account.
  */
-export function invalidateCachedRisk(accountId: number): void {
-  cache.del(riskKey(accountId));
+export async function invalidateCachedRisk(accountId: number): Promise<void> {
+  try {
+    const client = await getRedisClient();
+    if (client) {
+      await client.del(riskKey(accountId));
+    }
+  } catch (error) {
+    logger.error("Error invalidating cached risk:", error);
+  }
 }

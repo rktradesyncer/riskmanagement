@@ -1,7 +1,3 @@
-import type { IRouteController } from "../shared/interface";
-
-export interface ISystemController extends IRouteController {}
-
 export interface IHealthResponse {
   status: "ok";
   service: string;

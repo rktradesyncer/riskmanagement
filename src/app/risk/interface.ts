@@ -1,8 +1,17 @@
-import type { IRouteController } from "../shared/interface";
 import type { UserAccountAutoLiq } from "../../lib/risk";
-import type { IApiErrorResponse } from "../shared/interface";
+import type { IApiErrorResponse } from "../../types/global";
+import Joi from "joi";
+import { IRequest } from "../../types/global";
 
-export interface IRiskController extends IRouteController {}
+export interface IGetRiskRequest extends IRequest {
+  query: IRiskQuery;
+  params: IRiskParams;
+}
+
+export interface ISetRiskRequest extends IRequest {
+  params: IRiskParams;
+  payload: ISetRiskPayload;
+}
 
 export interface IRiskParams {
   accountId: number;
@@ -40,3 +49,31 @@ export interface IRiskSetResponse {
 }
 
 export type IRiskErrorResponse = IApiErrorResponse;
+
+export const ErrorSchema = Joi.object({
+  success: Joi.boolean().example(false),
+  error: Joi.string().example("Error description"),
+  code: Joi.string().optional().example("TOKEN_EXPIRED"),
+}).label("ErrorResponse");
+
+export const AutoLiqSchema = Joi.object({
+  id: Joi.number().integer().example(37857980),
+  dailyLossAutoLiq: Joi.number().allow(null).example(500),
+  dailyProfitAutoLiq: Joi.number().allow(null).example(1000),
+  weeklyLossAutoLiq: Joi.number().allow(null).optional(),
+  weeklyProfitAutoLiq: Joi.number().allow(null).optional(),
+  dailyLossAlert: Joi.number().allow(null).optional(),
+  dailyLossPercentageAlert: Joi.number().allow(null).optional(),
+  marginPercentageAlert: Joi.number().allow(null).optional(),
+  dailyLossLiqOnly: Joi.number().allow(null).optional(),
+  dailyLossPercentageLiqOnly: Joi.number().allow(null).optional(),
+  marginPercentageLiqOnly: Joi.number().allow(null).optional(),
+  dailyLossPercentageAutoLiq: Joi.number().allow(null).optional(),
+  marginPercentageAutoLiq: Joi.number().allow(null).optional(),
+  trailingMaxDrawdown: Joi.number().allow(null).optional(),
+  trailingMaxDrawdownLimit: Joi.number().allow(null).optional(),
+  trailingMaxDrawdownMode: Joi.string().valid("EOD", "RealTime").allow(null).optional(),
+  flattenTimestamp: Joi.string().allow(null).optional(),
+  doNotUnlock: Joi.boolean().allow(null).optional(),
+  changesLocked: Joi.boolean().allow(null).optional(),
+}).unknown(true).label("AutoLiqSettings");

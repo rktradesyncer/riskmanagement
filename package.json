@@ -4,14 +4,14 @@
   "description": "Microservice for setting daily loss limits and profit targets on Tradovate accounts",
   "private": true,
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch src/server.ts",
-    "prod": "NODE_ENV=production tsx watch src/server.ts",
+    "dev": "NODE_ENV=development tsx watch src/index.ts",
+    "prod": "NODE_ENV=production tsx watch src/index.ts",
     "build": "tsc",
-    "start": "NODE_ENV=production node dist/server.js",
-    "service:dev": "NODE_ENV=development tsx watch src/server.ts",
-    "service:prod": "NODE_ENV=production tsx watch src/server.ts",
+    "start": "NODE_ENV=production node dist/index.js",
+    "service:dev": "NODE_ENV=development tsx watch src/index.ts",
+    "service:prod": "NODE_ENV=production tsx watch src/index.ts",
     "service:build": "tsc",
-    "service:start": "NODE_ENV=production node dist/server.js"
+    "service:start": "NODE_ENV=production node dist/index.js"
   },
   "keywords": [
     "tradovate",
@@ -31,6 +31,7 @@
     "joi": "^17.13.3",
     "node-cache": "^5.1.2",
     "prom-client": "^15.1.3",
+    "redis": "^5.11.0",
     "winston": "^3.19.0",
     "winston-loki": "^6.1.3"
   },

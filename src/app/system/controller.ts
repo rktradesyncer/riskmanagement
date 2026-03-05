@@ -1,9 +1,15 @@
-import type { ServerRoute } from "@hapi/hapi";
-import type { ISystemController } from "./interface";
-import { systemRoutes } from "../../routes/system";
+import Hapi from '@hapi/hapi';
 
-export class SystemController implements ISystemController {
-  getRoutes(): ServerRoute[] {
-    return systemRoutes;
+export class SystemController {
+
+  constructor() { }
+
+  public async system(request: Hapi.Request, h: Hapi.ResponseToolkit) {
+    return ({
+      status: "ok",
+      service: "tradovate-risk-management",
+      timestamp: new Date().toISOString(),
+    });
   }
+
 }

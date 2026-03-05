@@ -24,6 +24,12 @@ export function initFirebase(): void {
   console.log("Firebase Admin initialized (auth only)");
 }
 
+
+export const firebaseAdmin = admin.initializeApp({
+  credential: process.env.SERVICE_ACCOUNT_KEY ?
+    admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT_KEY) as admin.ServiceAccount) :
+    admin.credential.applicationDefault()
+});
 /**
  * Verify a Firebase ID token from the frontend.
  * Returns the decoded token with uid.
