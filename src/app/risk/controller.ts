@@ -115,12 +115,6 @@ export class RiskController {
           .code(401);
       }
 
-      if (message.includes("Unsupported parameters")) {
-        return h
-          .response({ success: false, error: message, code: "UNSUPPORTED_PARAMS" })
-          .code(400);
-      }
-
       if (message.includes("Should be account owner")) {
         return h
           .response({ success: false, error: "Insufficient permissions. You are not the account owner.", code: "NOT_OWNER" })

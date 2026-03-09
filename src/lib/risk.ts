@@ -114,8 +114,8 @@ export async function listAllAutoLiqSettings(
 /**
  * Create or update auto-liq settings for a given account.
  *
- * Uses the higher-level `updateUserAutoLiq` endpoint which handles
- * both creation and updates in one call, keyed by accountId.
+ * Uses `/userAccountAutoLiq/update` per Tradovate Partner API docs.
+ * Supports all fields for both owned and permissioned accounts.
  */
 export async function setAutoLiqSettings(
   auth: TradovateAuth,
@@ -138,8 +138,6 @@ export async function setAutoLiqSettings(
     );
   }
 
-  // Permissioned users get data in permissionedAccountAutoLiq,
-  // account owners get it in userAccountAutoLiq.
   const autoLiq = result.userAccountAutoLiq
     ?? (result.permissionedAccountAutoLiq as UserAccountAutoLiq | undefined);
 

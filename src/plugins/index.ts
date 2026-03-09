@@ -3,7 +3,7 @@ import Inert from "@hapi/inert";
 import Vision from "@hapi/vision";
 import HapiSwagger from "hapi-swagger";
 import HapiRateLimit from "hapi-rate-limit";
-import { firebaseAdmin } from '../lib/firebase';
+import { getFirebaseAdmin } from '../lib/firebase';
 import { grafanaPlugin } from "../lib/grafana";
 
 export default class Plugins {
@@ -19,7 +19,7 @@ export default class Plugins {
 
       //firebase
       server.auth.strategy('firebase', 'firebase', {
-        instance: firebaseAdmin
+        instance: getFirebaseAdmin()
       })
 
     } catch (error) {

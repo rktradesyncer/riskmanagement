@@ -36,7 +36,7 @@ export async function getConnectionToken(
   const supabase = getSupabase();
 
   const { data, error } = await supabase
-    .from("tdv_access_token")
+    .from("connection_tdv_access_token")
     .select("*")
     .eq("uid", userId)
     .eq("ref", connectionRef)

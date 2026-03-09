@@ -1,35 +1,30 @@
 import admin from "firebase-admin";
 
-let initialized = false;
+let app: admin.app.App | null = null;
 
 /**
- * Initialize Firebase Admin SDK (for auth token verification only).
+ * Get (or lazily initialize) the Firebase Admin app.
+ * Deferred so that dotenv has time to load env vars before we read them.
  */
-export function initFirebase(): void {
-  if (initialized) return;
+export function getFirebaseAdmin(): admin.app.App {
+  if (app) return app;
 
   const serviceAccountJson = process.env.SERVICE_ACCOUNT_KEY;
   if (serviceAccountJson) {
     const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({
+    app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
   } else {
-    admin.initializeApp({
+    app = admin.initializeApp({
       credential: admin.credential.applicationDefault(),
     });
   }
 
-  initialized = true;
   console.log("Firebase Admin initialized (auth only)");
+  return app;
 }
 
-
-export const firebaseAdmin = admin.initializeApp({
-  credential: process.env.SERVICE_ACCOUNT_KEY ?
-    admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT_KEY) as admin.ServiceAccount) :
-    admin.credential.applicationDefault()
-});
 /**
  * Verify a Firebase ID token from the frontend.
  * Returns the decoded token with uid.
@@ -37,5 +32,5 @@ export const firebaseAdmin = admin.initializeApp({
 export async function verifyAuthToken(
   idToken: string
 ): Promise<admin.auth.DecodedIdToken> {
-  return admin.auth().verifyIdToken(idToken);
+  return getFirebaseAdmin().auth().verifyIdToken(idToken);
 }

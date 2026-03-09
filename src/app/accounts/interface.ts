@@ -35,4 +35,4 @@ export const AccountSchema = Joi.object({
   autoLiqProfileId: Joi.number().integer().optional(),
   marginAccountType: Joi.string().optional().example("Speculator"),
   legalStatus: Joi.string().optional().example("Individual"),
-}).label("Account");
+}).unknown(true).label("Account");
